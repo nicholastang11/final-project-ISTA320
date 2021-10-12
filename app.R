@@ -10,19 +10,21 @@ library(lubridate)
 library(usmap)
 library(shiny)
 library(tidyverse)
+
 mental_health_survey_data <- read_csv("data/survey.csv")
 
-#change Gender col to lower for pre-processing
+#change Gender col to lower for pre-processing and creating 
+#collections of different gender inputs and categorizing
 mental_health_survey_data$Gender <- tolower(mental_health_survey_data$Gender)
+
 male <- c("male","m","male-ish", "cis male","mail","malr", "mal","make","msle","cis man")
 female <- c("female","trans-female","cis female","f","female (trans)","female (cis)","woman")
 other_gender <- c("queer/she/they","non-binary","nah","all","enby","fluid","genderqueer","androgyne",
                   "agender","male leaning androgynous","queer","a little about you","p")
 
+#min and max ages are unrealistic, will filter out
 min(mental_health_survey_data[,'Age']) 
 max(mental_health_survey_data[,'Age'])
-#min and max ages are unrealistic, will filter out
-
 
 #tidying data to make sure the person works for tech company
 #and to select the desired columns for viz
@@ -31,9 +33,17 @@ mental_health_survey_data_tidy <- mental_health_survey_data %>%
     select(Age,Gender,state,family_history:tech_company)
 
 #changing Gender col to male, female, or other
-mental_health_survey_data_tidy$Gender <-  ifelse(mental_health_survey_data_tidy$Gender %in% male, 'male', mental_health_survey_data_tidy$Gender) 
-mental_health_survey_data_tidy$Gender <-  ifelse(mental_health_survey_data_tidy$Gender %in% female, 'female', mental_health_survey_data_tidy$Gender)
-mental_health_survey_data_tidy$Gender <-  ifelse(mental_health_survey_data_tidy$Gender %in% other_gender, 'other', mental_health_survey_data_tidy$Gender)
+mental_health_survey_data_tidy$Gender <-  
+    ifelse(mental_health_survey_data_tidy$Gender %in%
+               male, 'male', mental_health_survey_data_tidy$Gender) 
+
+mental_health_survey_data_tidy$Gender <-  
+    ifelse(mental_health_survey_data_tidy$Gender %in%
+               female, 'female', mental_health_survey_data_tidy$Gender)
+
+mental_health_survey_data_tidy$Gender <-  
+    ifelse(mental_health_survey_data_tidy$Gender %in%
+               other_gender, 'other', mental_health_survey_data_tidy$Gender)
 
 #make new col for age groups
 mental_health_survey_data_tidy <- mental_health_survey_data_tidy %>% 
@@ -48,32 +58,42 @@ mental_health_survey_data_tidy <- mental_health_survey_data_tidy %>%
                                  Age >= 61  & Age <66  ~ '61-65',
     ))
 
-mental_health_survey_data_tidy$work_interfere <- factor(mental_health_survey_data_tidy$work_interfere,
-                                                        levels=c("Never", "Rarely", "Sometimes","Often"))
+#Reordering work_interfere column
+mental_health_survey_data_tidy$work_interfere <- 
+    factor(mental_health_survey_data_tidy$work_interfere,
+    levels=c("Never", "Rarely", "Sometimes","Often"))
 
+#Reordering no_employees column
+mental_health_survey_data_tidy$no_employees <- 
+    factor(mental_health_survey_data_tidy$no_employees,
+           levels=c("1-5", "6-25", "26-100", "100-500", "500-1000", "More than 1000"))
+
+#orders age_group col
 age_options <- mental_health_survey_data_tidy %>%
     distinct(age_group) %>%
     arrange(age_group)
 
+#orders Gender col
 gender_options <- mental_health_survey_data_tidy %>%
     distinct(Gender) %>%
     arrange(Gender)
-# Define UI for application that draws a histogram
+
+# Define UI for application that displays data viz
 ui <- fluidPage(
     
     # Application title
     titlePanel("Nick Tang ISTA320 Final Project"),
     
-    # Sidebar with a slider input for number of bins 
+    # Sidebar with info about the data
     sidebarLayout(
         fluid=TRUE,
         sidebarPanel(
             
             tags$div(class="header", checked=NA,
                      p("These visualizations analyze data from Kaggle about worker's mental health in the tech industry"),
-                     a(href="https://www.kaggle.com/osmi/mental-health-in-tech-survey
- ", "Data Source"),
+                     a(href="https://www.kaggle.com/osmi/mental-health-in-tech-survey", "Data Source"),
                      hr(),
+                     h3("Data Description:"),
                      p("This data was collected as a survey and needed a lot of\n
                         preprocessing to be able to make visualizations.\n
                         Some of the most used columns in this data set include:\n
@@ -87,7 +107,7 @@ ui <- fluidPage(
             )
         ),
         
-        # Show a plot of the generated distribution
+        # Show plots and tabs
         mainPanel(
             tabsetPanel(type = "tabs",
                         tabPanel("Ages vs Mental Health", 
@@ -110,8 +130,10 @@ ui <- fluidPage(
     )
 )
 
-# Define server logic required to draw a histogram
+
+# Defines server logic required to draw the plots
 server <- function(input, output) {
+    
     output$age_plot <- renderPlot({
         mental_health_survey_data_tidy %>%
             filter(age_group == input$age_to_highlight) %>% 
@@ -119,8 +141,15 @@ server <- function(input, output) {
             geom_point()+
             geom_jitter(width = .3, height = .4, size = 3,alpha = .8)+
             ggtitle("How Tech Jobs Affect Mental Health (Age)") +
-            xlab("How Much Work Interferes With Mental Health")+
-            ylab("Age Group")+
+            labs(x = "How Much Work Interferes With Mental Health",
+                 y = "Age Group",
+                 caption = "There are no siginificant differences between age groups
+                 and stress levels at work")+
+            theme(axis.text = element_text(size = 12),
+                  axis.title = element_text(size = 14,face = "bold"),
+                  plot.title = element_text(size = 16,face = "bold"),
+                  plot.caption = element_text(size = 10, face = "italic")
+            )+
             scale_color_manual(values = c("red", "seagreen", "dodgerblue2","orange"))
     })
     
@@ -131,8 +160,14 @@ server <- function(input, output) {
             geom_point()+
             geom_jitter(width = .3, height = .4, size = 3, alpha = .8)+
             ggtitle("How Tech Jobs Affect Mental Health (Gender)") +
-            xlab("How Much Work Interferes With Mental Health")+
-            ylab("Gender")+
+            labs(x = "How Much Work Interferes With Mental Health",
+                 y = "Gender",
+                 caption = "It looks like no matter what gender, the majority will feel some stress at work") +
+            theme(axis.text = element_text(size = 12),
+                  axis.title = element_text(size = 14,face = "bold"),
+                  plot.title = element_text(size = 16,face = "bold"),
+                  plot.caption = element_text(size = 10, face = "italic")
+                  )+
             scale_color_manual(values = c("red", "black", "dodgerblue2","orange"))
     })
     
@@ -144,7 +179,9 @@ server <- function(input, output) {
             scale_fill_continuous(name = "Ages",
                                   low = "lightblue", 
                                   high = "darkorchid") +
-            ggtitle("Ages of Tech Workers Across the United States")
+            ggtitle("Ages of Tech Workers Across the United States") +
+            theme(plot.title = element_text(size = 14, face = "bold")
+                  )
     })
     
     output$company_size_plot <- renderPlot({
@@ -152,20 +189,30 @@ server <- function(input, output) {
             ggplot(aes(x=work_interfere,fill=no_employees))+
             geom_bar()+
             ggtitle("Number of Employees and Mental Helath") +
-            xlab("How Much Work Interferes With Mental Health") +
-            ylab("Count")
+            labs(x = "How Much Work Interferes With Mental Health",
+                 y = "Count") +
+            theme(axis.text = element_text(size = 12),
+                  axis.title = element_text(size = 14,face = "bold"),
+                  plot.title = element_text(size = 16,face = "bold")
+                  )
         
     })
     
     output$family_history_plot <- renderPlot({
-        
         mental_health_survey_data_tidy %>% 
             filter(work_interfere == "Sometimes" | work_interfere == "Often") %>% 
             ggplot(aes(x=work_interfere,fill=family_history))+
             geom_bar() +
             ggtitle("Worker's mental health and Their Family History") +
-            xlab("How Much Work Interferes With Mental Health") +
-            ylab("Count")
+            labs(x = "How Much Work Interferes With Mental Health",
+                 y = "Count",
+                 caption = "This plot shows that those with history of mental health problems
+                 are more likely to suffer from issues in work") +
+            theme(axis.text = element_text(size = 12),
+                  axis.title = element_text(size = 14,face = "bold"),
+                  plot.title = element_text(size = 16,face = "bold"),
+                  plot.caption = element_text(size = 10, face = "italic")
+                  )
     })
 }
 
